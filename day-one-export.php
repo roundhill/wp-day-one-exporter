@@ -8,21 +8,23 @@ Author: Dan Roundhill
 
 // Add an admin menu
 add_action('admin_menu', 'day_one_export_menu');
-function day_one_export_menu() {
+function day_one_export_menu()
+{
     add_menu_page('Day One Export', 'Day One Export', 'manage_options', 'day-one-export', 'day_one_export_page');
 }
 
 // Display the admin page
-function day_one_export_page() {
-    ?>
+function day_one_export_page()
+{
+?>
     <div class="wrap">
         <h1>Day One Export</h1>
         <button id="start-export" class="button button-primary">Start Export</button>
         <p id="export-progress"></p>
     </div>
     <script>
-        jQuery(document).ready(function ($) {
-            $('#start-export').on('click', function () {
+        jQuery(document).ready(function($) {
+            $('#start-export').on('click', function() {
                 $('#export-progress').html('Starting export...');
                 startExport(0);
             });
@@ -33,18 +35,19 @@ function day_one_export_page() {
                     nonce: '<?php echo wp_create_nonce('day_one_export_nonce'); ?>',
                     offset: offset
                 };
-                $.post(ajaxurl, data, function (response) {
+                $.post(ajaxurl, data, function(response) {
                     $('#export-progress').append(response);
                 });
             }
         });
     </script>
-    <?php
+<?php
 }
 
 // Export function
 add_action('wp_ajax_start_day_one_export', 'start_day_one_export');
-function start_day_one_export() {
+function start_day_one_export()
+{
     // Check nonce
     if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'day_one_export_nonce')) {
         die('Unauthorized access.');
@@ -59,13 +62,13 @@ function start_day_one_export() {
     $batch_size = 100;
     $offset = isset($_POST['offset']) ? intval($_POST['offset']) : 0;
 
-	$do_dir = WP_CONTENT_DIR . '/uploads/day-one/';
-	$do_media_dir = WP_CONTENT_DIR . '/uploads/day-one-media/';
-	if (!file_exists($do_dir )) {
-        wp_mkdir_p($do_dir );
+    $do_dir = WP_CONTENT_DIR . '/uploads/day-one/';
+    $do_media_dir = WP_CONTENT_DIR . '/uploads/day-one-media/';
+    if (!file_exists($do_dir)) {
+        wp_mkdir_p($do_dir);
     }
-	if (!file_exists($do_media_dir )) {
-        wp_mkdir_p($do_media_dir );
+    if (!file_exists($do_media_dir)) {
+        wp_mkdir_p($do_media_dir);
     }
     // Todo: cleanup files from previous exports
 
@@ -88,85 +91,85 @@ function start_day_one_export() {
 
     // Process posts for the batch
     foreach ($posts as $post) {
-         // Generate UUID from post title hash
-		 $uuid = strtoupper(substr(str_replace('-', '', wp_generate_uuid4()), 0, 32)); // Remove dashes, convert to uppercase, and limit length
+        // Generate UUID from post title hash
+        $uuid = strtoupper(substr(str_replace('-', '', wp_generate_uuid4()), 0, 32)); // Remove dashes, convert to uppercase, and limit length
 
-		 $post_data = array(
-			 'creationDate' => date('Y-m-d\TH:i:s\Z', strtotime(get_post_time('c', true, $post->ID))),
-			 'uuid' => $uuid,
-			 'starred' => false, // No equivalent in WordPress
-			 'text' => '', // Empty for now, we'll fill it later
-			 'tags' => array(), // Initialize tags array
-			 'photos' => array(), // Initialize photos array
-			 'videos' => array(), // Initialize videos array
-		 );
- 
-		 // Get post title and add it as a markdown heading in the post content
-		 $post_title = sanitize_text_field($post->post_title);
-		 if (!empty($post_title)) {
-			 $post_data['text'] = "# $post_title\n\n";
-		 }
- 
-		 // Get post tags
-		 $post_tags = wp_get_post_tags($post->ID);
-		 if ($post_tags) {
-			 foreach ($post_tags as $tag) {
-				 $post_data['tags'][] = $tag->name;
-			 }
-		 }
- 
-		 // Find media URLs in post content and save media files
-		 preg_match_all('/<img.*?src=["\'](.*?)["\'].*?>/i', $post->post_content, $image_matches);
-		 preg_match_all('/<video.*?src=["\'](.*?)["\'].*?>/i', $post->post_content, $video_matches);
- 
-		 $media_urls = array_merge($image_matches[0], $video_matches[0]);
- 
-		 foreach ($media_urls as $media_tag) {
-			 preg_match('/src=["\'](.*?)["\']/', $media_tag, $src_matches);
-			 $media_url = $src_matches[1];
- 
-			 $parsed_url = parse_url($media_url);
-			 $media_filename = basename($parsed_url['path']);
- 
-			 $media_md5 = md5_file($media_url);
-			 $media_ext = pathinfo($media_filename, PATHINFO_EXTENSION);
-			 $media_uuid = $media_uuid = strtoupper(substr(str_replace('-', '', wp_generate_uuid4()), 0, 32));
-			 $media_filepath = $do_media_dir . $media_md5 . '.' . $media_ext;
- 
-			 // Download media file
-			 $media_content = file_get_contents($media_url);
-			 file_put_contents($media_filepath, $media_content);
- 
-			 // Replace entire media tag with "dayone-moment://" URL directly in the post content
-			 $post->post_content = str_replace($media_tag, "![](dayone-moment://$media_uuid)", $post->post_content);
- 
-			 // Add media to photos or videos array based on file extension
-			 $media_type = $media_ext;
-			 $media_date = date('Y-m-d\TH:i:s\Z', filemtime($media_filepath));
-			 $media_item = array(
-				 'identifier' => $media_uuid, // Use UUID for identifier
-				 'date' => $media_date,
-				 'type' => $media_type,
-				 'md5' => $media_md5,
-			 );
- 
-			 if (in_array($media_type, array('jpg', 'jpeg', 'png', 'gif'))) {
-				 $post_data['photos'][] = $media_item;
-			 } elseif (in_array($media_type, array('mp4', 'mov', 'avi', 'wmv'))) {
-				 $post_data['videos'][] = $media_item;
-			 }
-		 }
- 
-		 // Convert HTML tags to Markdown
-		 $markdown_content = convert_html_to_markdown($post->post_content);
- 
-		 // Convert line breaks
-		 $markdown_content = str_replace("   \n\n", "\n\n", $markdown_content);
-		 //$markdown_content = str_replace("\r", "\\n", $markdown_content);
- 
-		 $post_data['text'] .= $markdown_content;
- 
-		 $export_data['entries'][] = $post_data;
+        $post_data = array(
+            'creationDate' => date('Y-m-d\TH:i:s\Z', strtotime(get_post_time('c', true, $post->ID))),
+            'uuid' => $uuid,
+            'starred' => false, // No equivalent in WordPress
+            'text' => '', // Empty for now, we'll fill it later
+            'tags' => array(), // Initialize tags array
+            'photos' => array(), // Initialize photos array
+            'videos' => array(), // Initialize videos array
+        );
+
+        // Get post title and add it as a markdown heading in the post content
+        $post_title = sanitize_text_field($post->post_title);
+        if (!empty($post_title)) {
+            $post_data['text'] = "# $post_title\n\n";
+        }
+
+        // Get post tags
+        $post_tags = wp_get_post_tags($post->ID);
+        if ($post_tags) {
+            foreach ($post_tags as $tag) {
+                $post_data['tags'][] = $tag->name;
+            }
+        }
+
+        // Find media URLs in post content and save media files
+        preg_match_all('/<img.*?src=["\'](.*?)["\'].*?>/i', $post->post_content, $image_matches);
+        preg_match_all('/<video.*?src=["\'](.*?)["\'].*?>/i', $post->post_content, $video_matches);
+
+        $media_urls = array_merge($image_matches[0], $video_matches[0]);
+
+        foreach ($media_urls as $media_tag) {
+            preg_match('/src=["\'](.*?)["\']/', $media_tag, $src_matches);
+            $media_url = $src_matches[1];
+
+            $parsed_url = parse_url($media_url);
+            $media_filename = basename($parsed_url['path']);
+
+            $media_md5 = md5_file($media_url);
+            $media_ext = pathinfo($media_filename, PATHINFO_EXTENSION);
+            $media_uuid = $media_uuid = strtoupper(substr(str_replace('-', '', wp_generate_uuid4()), 0, 32));
+            $media_filepath = $do_media_dir . $media_md5 . '.' . $media_ext;
+
+            // Download media file
+            $media_content = file_get_contents($media_url);
+            file_put_contents($media_filepath, $media_content);
+
+            // Replace entire media tag with "dayone-moment://" URL directly in the post content
+            $post->post_content = str_replace($media_tag, "![](dayone-moment://$media_uuid)", $post->post_content);
+
+            // Add media to photos or videos array based on file extension
+            $media_type = $media_ext;
+            $media_date = date('Y-m-d\TH:i:s\Z', filemtime($media_filepath));
+            $media_item = array(
+                'identifier' => $media_uuid, // Use UUID for identifier
+                'date' => $media_date,
+                'type' => $media_type,
+                'md5' => $media_md5,
+            );
+
+            if (in_array($media_type, array('jpg', 'jpeg', 'png', 'gif'))) {
+                $post_data['photos'][] = $media_item;
+            } elseif (in_array($media_type, array('mp4', 'mov', 'avi', 'wmv'))) {
+                $post_data['videos'][] = $media_item;
+            }
+        }
+
+        // Convert HTML tags to Markdown
+        $markdown_content = convert_html_to_markdown($post->post_content);
+
+        // Convert line breaks
+        $markdown_content = str_replace("   \n\n", "\n\n", $markdown_content);
+        //$markdown_content = str_replace("\r", "\\n", $markdown_content);
+
+        $post_data['text'] .= $markdown_content;
+
+        $export_data['entries'][] = $post_data;
     }
 
     // Convert to JSON
@@ -191,7 +194,8 @@ function start_day_one_export() {
 
 // Finalize export and create zip file
 add_action('admin_post_finalize_day_one_export', 'finalize_day_one_export');
-function finalize_day_one_export() {
+function finalize_day_one_export()
+{
     // Check user capability
     if (!current_user_can('manage_options')) {
         die('Unauthorized access.');
@@ -232,13 +236,14 @@ function finalize_day_one_export() {
 }
 
 // Function to convert HTML tags to Markdown
-function convert_html_to_markdown($html_content) {
+function convert_html_to_markdown($html_content)
+{
     $p = new WP_HTML_Tag_Processor($html_content);
 
     $text_content  = '';
     $in_pre        = false;
     $needs_newline = false;
-	$prev_was_li   = false;
+    $prev_was_li   = false;
 
     while ($p->next_token()) {
         $node_name = $p->get_token_name();
@@ -247,9 +252,9 @@ function convert_html_to_markdown($html_content) {
         $tag_name  = '#tag' === $p->get_token_type() ? ($p->is_tag_closer() ? '-' : '+') . $node_name : $node_name;
         $href      = '';
 
-		if ( '#tag' === $p->get_token_type() && ! $p->is_tag_closer() && is_line_breaker( $node_name ) ) {
-			$needs_newline = ! $prev_was_li;
-		}
+        if ('#tag' === $p->get_token_type() && !$p->is_tag_closer() && is_line_breaker($node_name)) {
+            $needs_newline = !$prev_was_li;
+        }
 
         switch ($tag_name) {
             case '+LI':
@@ -305,13 +310,13 @@ function convert_html_to_markdown($html_content) {
 
             case '+A':
                 $href = $p->get_attribute('href');
-				$text = '';
-				$p->next_token();
-				if ( '#text' === $p->get_token_name() ) {
-					$text = "[{$p->get_modifiable_text()}]";
-				}
+                $text = '';
+                $p->next_token();
+                if ('#text' === $p->get_token_name()) {
+                    $text = "[{$p->get_modifiable_text()}]";
+                }
 
-				$text_content .= "$text($href)";
+                $text_content .= "$text($href)";
 
                 break;
 
@@ -328,27 +333,28 @@ function convert_html_to_markdown($html_content) {
     return trim($text_content);
 }
 
-function is_line_breaker( $tag_name ) {
-	switch ( $tag_name ) {
-		case 'BLOCKQUOTE':
-		case 'BR':
-		case 'DD':
-		case 'DIV':
-		case 'DL':
-		case 'DT':
-		case 'H1':
-		case 'H2':
-		case 'H3':
-		case 'H4':
-		case 'H5':
-		case 'H6':
-		case 'HR':
-		case 'LI':
-		case 'OL':
-		case 'P':
-		case 'UL':
-			return true;
-	}
+function is_line_breaker($tag_name)
+{
+    switch ($tag_name) {
+        case 'BLOCKQUOTE':
+        case 'BR':
+        case 'DD':
+        case 'DIV':
+        case 'DL':
+        case 'DT':
+        case 'H1':
+        case 'H2':
+        case 'H3':
+        case 'H4':
+        case 'H5':
+        case 'H6':
+        case 'HR':
+        case 'LI':
+        case 'OL':
+        case 'P':
+        case 'UL':
+            return true;
+    }
 
-	return false;
+    return false;
 }
