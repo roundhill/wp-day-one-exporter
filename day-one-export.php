@@ -141,7 +141,7 @@ function start_day_one_export()
             file_put_contents($media_filepath, $media_content);
 
             // Replace entire media tag with "dayone-moment://" URL directly in the post content
-            $post->post_content = str_replace($media_tag, "![](dayone-moment://$media_uuid)", $post->post_content);
+            $post->post_content = str_replace($media_tag, "<p>![](dayone-moment://$media_uuid)</p>", $post->post_content);
 
             // Add media to photos or videos array based on file extension
             $media_type = $media_ext;
@@ -162,10 +162,6 @@ function start_day_one_export()
 
         // Convert HTML tags to Markdown
         $markdown_content = convert_html_to_markdown($post->post_content);
-
-        // Convert line breaks
-        $markdown_content = str_replace("   \n\n", "\n\n", $markdown_content);
-        //$markdown_content = str_replace("\r", "\\n", $markdown_content);
 
         $post_data['text'] .= $markdown_content;
 
@@ -269,7 +265,6 @@ function convert_html_to_markdown($html_content)
             case '+H5':
             case '+H6':
                 $text_content .= "\n\n" . str_pad('', intval($node_name[1]), '#') . ' ';
-                $needs_newline = false;
                 break;
 
             case '+IMG':
@@ -325,7 +320,7 @@ function convert_html_to_markdown($html_content)
                     $text_content .= "\n\n";
                     $needs_newline = false;
                 }
-                $text_content .= $in_pre ? $node_text : preg_replace('~[ \t\r\f\n]+~', ' ', $node_text);
+                $text_content .= trim($in_pre ? $node_text : preg_replace('~[ \t\r\f\n]+~', ' ', $node_text));
                 break;
         }
     }
@@ -342,6 +337,7 @@ function is_line_breaker($tag_name)
         case 'DIV':
         case 'DL':
         case 'DT':
+        case 'FIGCAPTION':
         case 'H1':
         case 'H2':
         case 'H3':
