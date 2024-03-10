@@ -320,7 +320,7 @@ function convert_html_to_markdown($html_content)
                     $text_content .= "\n\n";
                     $needs_newline = false;
                 }
-                $text_content .= trim($in_pre ? $node_text : preg_replace('~[ \t\r\f\n]+~', ' ', $node_text));
+                $text_content .= $in_pre ? $node_text : preg_replace('~[ \t\r\f\n]+~', ' ', $node_text);
                 break;
         }
     }
