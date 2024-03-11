@@ -227,7 +227,6 @@ function process_post_html($html_content, &$post_data, &$export_data, $do_media_
             case '+IMG':
             case '+SOURCE':
                 $media_url = $p->get_attribute( 'src' );
-                $media_url = str_replace('danroundhill.com', 'roundhill.blog', $media_url);
                 if ( is_string( $media_url ) && ! empty( $media_url ) ) {
                     $parsed_url = parse_url($media_url);
                     $media_filename = basename($parsed_url['path']);
