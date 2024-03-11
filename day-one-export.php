@@ -227,17 +227,22 @@ function process_post_html($html_content, &$post_data, &$export_data, $do_media_
             case '+IMG':
             case '+SOURCE':
                 $media_url = $p->get_attribute( 'src' );
-                if ( is_string( $media_url ) ) {
+                $media_url = str_replace('danroundhill.com', 'roundhill.blog', $media_url);
+                if ( is_string( $media_url ) && ! empty( $media_url ) ) {
                     $parsed_url = parse_url($media_url);
                     $media_filename = basename($parsed_url['path']);
 
-                    $media_md5 = md5_file($media_url);
+                    $media_content = file_get_contents($media_url);
+                    if ( !$media_content ) {
+                        break;
+                    }
+
+                    $media_md5 = md5($media_content);
                     $media_ext = pathinfo($media_filename, PATHINFO_EXTENSION);
                     $media_uuid = $media_uuid = strtoupper(substr(str_replace('-', '', wp_generate_uuid4()), 0, 32));
                     $media_filepath = $do_media_dir . $media_md5 . '.' . $media_ext;
 
                     // Download media file
-                    $media_content = file_get_contents($media_url);
                     file_put_contents($media_filepath, $media_content);
 
                     // Replace entire media tag with "dayone-moment://" URL directly in the post content
