@@ -95,7 +95,7 @@ function start_day_one_export()
         $uuid = strtoupper(substr(str_replace('-', '', wp_generate_uuid4()), 0, 32)); // Remove dashes, convert to uppercase, and limit length
 
         // Process content like shortcodes
-        apply_filters( 'the_content', $post->post_content );
+        $post_content = apply_filters( 'the_content', $post->post_content );
 
         $post_data = array(
             'creationDate' => date('Y-m-d\TH:i:s\Z', strtotime(get_post_time('c', true, $post->ID))),
@@ -108,7 +108,7 @@ function start_day_one_export()
         );
 
         // Get post title and add it as a markdown heading in the post content
-        $post_title = sanitize_text_field($post->post_title);
+        $post_title = $post->post_title;
         if (!empty($post_title)) {
             $post_data['text'] = "# $post_title\n\n";
         }
@@ -122,7 +122,7 @@ function start_day_one_export()
         }
 
         // Process HTML, replace media with Day One URLs, and add to export data
-        process_post_html($post->post_content, $post_data, $export_data, $do_media_dir);
+        process_post_html($post_content, $post_data, $export_data, $do_media_dir);
     }
 
     // Convert to JSON
