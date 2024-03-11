@@ -94,6 +94,9 @@ function start_day_one_export()
         // Generate UUID from post title hash
         $uuid = strtoupper(substr(str_replace('-', '', wp_generate_uuid4()), 0, 32)); // Remove dashes, convert to uppercase, and limit length
 
+        // Process content like shortcodes
+        apply_filters( 'the_content', $post->post_content );
+
         $post_data = array(
             'creationDate' => date('Y-m-d\TH:i:s\Z', strtotime(get_post_time('c', true, $post->ID))),
             'uuid' => $uuid,
@@ -118,54 +121,8 @@ function start_day_one_export()
             }
         }
 
-        // Find media URLs in post content and save media files
-        preg_match_all('/<img.*?src=["\'](.*?)["\'].*?>/i', $post->post_content, $image_matches);
-        preg_match_all('/<video.*?src=["\'](.*?)["\'].*?>/i', $post->post_content, $video_matches);
-
-        $media_urls = array_merge($image_matches[0], $video_matches[0]);
-
-        foreach ($media_urls as $media_tag) {
-            preg_match('/src=["\'](.*?)["\']/', $media_tag, $src_matches);
-            $media_url = $src_matches[1];
-
-            $parsed_url = parse_url($media_url);
-            $media_filename = basename($parsed_url['path']);
-
-            $media_md5 = md5_file($media_url);
-            $media_ext = pathinfo($media_filename, PATHINFO_EXTENSION);
-            $media_uuid = $media_uuid = strtoupper(substr(str_replace('-', '', wp_generate_uuid4()), 0, 32));
-            $media_filepath = $do_media_dir . $media_md5 . '.' . $media_ext;
-
-            // Download media file
-            $media_content = file_get_contents($media_url);
-            file_put_contents($media_filepath, $media_content);
-
-            // Replace entire media tag with "dayone-moment://" URL directly in the post content
-            $post->post_content = str_replace($media_tag, "<p>![](dayone-moment://$media_uuid)</p>", $post->post_content);
-
-            // Add media to photos or videos array based on file extension
-            $media_type = $media_ext;
-            $media_date = date('Y-m-d\TH:i:s\Z', filemtime($media_filepath));
-            $media_item = array(
-                'identifier' => $media_uuid, // Use UUID for identifier
-                'date' => $media_date,
-                'type' => $media_type,
-                'md5' => $media_md5,
-            );
-
-            if (in_array($media_type, array('jpg', 'jpeg', 'png', 'gif'))) {
-                $post_data['photos'][] = $media_item;
-            } elseif (in_array($media_type, array('mp4', 'mov', 'avi', 'wmv'))) {
-                $post_data['videos'][] = $media_item;
-            }
-        }
-
-        // Convert HTML tags to Markdown
-        $markdown_content = convert_html_to_markdown($post->post_content);
-
-        $post_data['text'] .= $markdown_content;
-
-        $export_data['entries'][] = $post_data;
+        // Process HTML, replace media with Day One URLs, and add to export data
+        process_post_html($post->post_content, $post_data, $export_data, $do_media_dir);
     }
 
     // Convert to JSON
@@ -232,7 +189,7 @@ function finalize_day_one_export()
 }
 
 // Function to convert HTML tags to Markdown
-function convert_html_to_markdown($html_content)
+function process_post_html($html_content, &$post_data, &$export_data, $do_media_dir = '')
 {
     $p = new WP_HTML_Tag_Processor($html_content);
 
@@ -268,9 +225,39 @@ function convert_html_to_markdown($html_content)
                 break;
 
             case '+IMG':
-                $alt = $p->get_attribute('alt');
-                if (is_string($alt) && !empty($alt)) {
-                    $text_content .= "![$alt]";
+            case '+SOURCE':
+                $media_url = $p->get_attribute( 'src' );
+                if ( is_string( $media_url ) ) {
+                    $parsed_url = parse_url($media_url);
+                    $media_filename = basename($parsed_url['path']);
+
+                    $media_md5 = md5_file($media_url);
+                    $media_ext = pathinfo($media_filename, PATHINFO_EXTENSION);
+                    $media_uuid = $media_uuid = strtoupper(substr(str_replace('-', '', wp_generate_uuid4()), 0, 32));
+                    $media_filepath = $do_media_dir . $media_md5 . '.' . $media_ext;
+
+                    // Download media file
+                    $media_content = file_get_contents($media_url);
+                    file_put_contents($media_filepath, $media_content);
+
+                    // Replace entire media tag with "dayone-moment://" URL directly in the post content
+                    $text_content .= "\n\n![](dayone-moment://$media_uuid)";
+
+                    // Add media to photos or videos array based on file extension
+                    $media_type = $media_ext;
+                    $media_date = date('Y-m-d\TH:i:s\Z', filemtime($media_filepath));
+                    $media_item = array(
+                        'identifier' => $media_uuid, // Use UUID for identifier
+                        'date' => $media_date,
+                        'type' => $media_type,
+                        'md5' => $media_md5,
+                    );
+
+                    if (in_array($media_type, array('jpg', 'jpeg', 'png', 'gif'))) {
+                        $post_data['photos'][] = $media_item;
+                    } elseif (in_array($media_type, array('mp4', 'mov', 'avi', 'wmv'))) {
+                        $post_data['videos'][] = $media_item;
+                    }
                 }
                 break;
 
@@ -325,7 +312,9 @@ function convert_html_to_markdown($html_content)
         }
     }
 
-    return trim($text_content);
+    $post_data['text'] .= trim($text_content);
+
+    $export_data['entries'][] = $post_data;
 }
 
 function is_line_breaker($tag_name)
