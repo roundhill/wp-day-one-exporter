@@ -228,6 +228,7 @@ function process_post_html($html_content, &$post_data, &$export_data, $do_media_
             case '+SOURCE':
                 $media_url = $p->get_attribute( 'src' );
                 if ( is_string( $media_url ) && ! empty( $media_url ) ) {
+                    $media_url = remove_query_arg( array_keys( $_GET ), $media_url );
                     $parsed_url = parse_url($media_url);
                     $media_filename = basename($parsed_url['path']);
 
@@ -297,7 +298,7 @@ function process_post_html($html_content, &$post_data, &$export_data, $do_media_
                 $href = $p->get_attribute('href');
 
                 // Not-great workaround to avoid missing images within a tags
-                if (is_string($href) && preg_match('/\.(jpg|jpeg|png|gif|webp)$/i', $href)) {
+                if (is_string($href) && preg_match('/\.(jpg|jpeg|png|gif|webp)(\?.*)?$/i', $href)) {
                     break;
                 }
 
