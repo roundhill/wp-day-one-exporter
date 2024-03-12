@@ -244,9 +244,6 @@ function process_post_html($html_content, &$post_data, &$export_data, $do_media_
                     // Download media file
                     file_put_contents($media_filepath, $media_content);
 
-                    // Replace entire media tag with "dayone-moment://" URL directly in the post content
-                    $text_content .= "\n\n![](dayone-moment://$media_uuid)";
-
                     // Add media to photos or videos array based on file extension
                     $media_type = $media_ext;
                     $media_date = date('Y-m-d\TH:i:s\Z', filemtime($media_filepath));
@@ -259,8 +256,10 @@ function process_post_html($html_content, &$post_data, &$export_data, $do_media_
 
                     if (in_array($media_type, array('jpg', 'jpeg', 'png', 'gif'))) {
                         $post_data['photos'][] = $media_item;
+                        $text_content .= "\n\n![](dayone-moment://$media_uuid)";
                     } elseif (in_array($media_type, array('mp4', 'mov', 'avi', 'wmv'))) {
                         $post_data['videos'][] = $media_item;
+                        $text_content .= "\n\n![](dayone-moment://video/$media_uuid)";
                     }
                 }
                 break;
@@ -296,6 +295,12 @@ function process_post_html($html_content, &$post_data, &$export_data, $do_media_
 
             case '+A':
                 $href = $p->get_attribute('href');
+
+                // Not-great workaround to avoid missing images within a tags
+                if (is_string($href) && preg_match('/\.(jpg|jpeg|png|gif|webp)$/i', $href)) {
+                    break;
+                }
+
                 $text = '';
                 $p->next_token();
                 if ('#text' === $p->get_token_name()) {
